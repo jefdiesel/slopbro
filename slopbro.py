@@ -817,6 +817,7 @@ def build_self_hosted_url(
     local_ip = local_ip_override or local_ip_for_remote(tv_host)
     url = "http://%s:%d/%s" % (local_ip, server_port, ENTRY_PAGE)
     url += "?script=%s&files=%s" % (SHELL_SCRIPT, ";".join(SERVICE_FILES))
+    url += "&cb=%d" % int(__import__("time").time())  # local mod: cache-buster
     if debug:
         url += "&debug"
     if curl_insecure:
