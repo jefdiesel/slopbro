@@ -61,8 +61,12 @@ TARGET_APPS = [
 ENTRY_PAGE = "index.html"
 SHELL_SCRIPT = "autoroot.sh"
 SERVICE_FILES = [
+    "services.json",
     "package.json",
     "main.js",
+    "dropbear",
+    "run-js-service-no-cgroup",
+    "hbchannel.ipk",
 ]
 
 ASSET_SOURCE_AUTO = "auto"
