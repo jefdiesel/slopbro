@@ -1,0 +1,9 @@
+{
+    "id": "com.webos.service.jsserver",
+    "description": "SlopBro Root Service",
+    "services": [
+        {
+            "name": "com.webos.service.jsserver"
+        }
+    ]
+}
