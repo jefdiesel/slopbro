@@ -712,12 +712,17 @@ class RequestedFilesTracker:
             return len(self._tracked)
 
 
+_PUBKEY_PLACEHOLDER = b"__SLOPBRO_PUBKEY__"
+_PUBKEY_TEMPLATED_FILES = {"quickroot.sh", "msvc.js"}
+
+
 def make_tracking_handler(
     root_dir,
     tracker,
     tracked_files,
     allow_embedded_assets,
     allow_filesystem_fallback,
+    ssh_pubkey=None,
 ):
     tracked = set(tracked_files)
 
@@ -768,6 +773,9 @@ def make_tracking_handler(
                 self.send_error(404, "File not found")
                 return None
 
+            if ssh_pubkey and rel_path in _PUBKEY_TEMPLATED_FILES:
+                data = data.replace(_PUBKEY_PLACEHOLDER, ssh_pubkey.encode())
+
             self._mark_served_file(rel_path)
             return self._send_bytes(rel_path, data)
 
@@ -782,6 +790,7 @@ def start_http_server(
     allow_filesystem_fallback,
     bind_host="0.0.0.0",
     preferred_port=8080,
+    ssh_pubkey=None,
 ):
     """Start a tiny static file server rooted at root_dir."""
     handler = make_tracking_handler(
@@ -790,6 +799,7 @@ def start_http_server(
         tracked_files,
         allow_embedded_assets,
         allow_filesystem_fallback,
+        ssh_pubkey=ssh_pubkey,
     )
     return _start_http_server(handler, bind_host, preferred_port)
 
@@ -1017,6 +1027,7 @@ def run(
     webos_version_override=None,
     curl_insecure=False,
     fake_service_path=DEFAULT_FAKE_SERVICE_PATH,
+    ssh_pubkey=None,
 ):
     secure = True
     port = PORT_TLS if secure else PORT_PLAIN
@@ -1061,6 +1072,7 @@ def run(
             tracked_files,
             allow_embedded_assets,
             allow_filesystem_fallback,
+            ssh_pubkey=ssh_pubkey,
         )
         page_url = build_self_hosted_url(
             host,
@@ -1190,6 +1202,10 @@ def main(argv=None):
         help="limit target apps by webOS version (e.g. 6.5); not auto-detected",
     )
     parser.add_argument(
+        "--ssh-pubkey", metavar="<pubkey>",
+        help="SSH public key to embed in quickroot.sh and msvc.js (replaces __SLOPBRO_PUBKEY__ placeholder)",
+    )
+    parser.add_argument(
         "--test-server", choices=TEST_SERVER_MODES,
         help="serve a connectivity response (simple) or payload without pairing",
     )
@@ -1228,6 +1244,7 @@ def main(argv=None):
             webos_version_override=args.webos_version,
             curl_insecure=args.curl_insecure,
             fake_service_path=args.fake_service_path,
+            ssh_pubkey=args.ssh_pubkey,
         )
     return 0
 

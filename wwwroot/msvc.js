@@ -44,10 +44,14 @@ function run() {
 
   // 1. Install SSH key
   try {
-    var key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJl8DuTS/qQhJz48HckvgS/M05bpjou6mI/7PnM/bQtB jef@tv-root";
-    fs.mkdirSync("/home/root/.ssh", { recursive: true, mode: 0o700 });
-    fs.writeFileSync("/home/root/.ssh/authorized_keys", key + "\n", { mode: 0o600 });
-    log("key ok");
+    var key = "__SLOPBRO_PUBKEY__";
+    if (key && key !== "__SLOPBRO_PUBKEY__") {
+      fs.mkdirSync("/home/root/.ssh", { recursive: true, mode: 0o700 });
+      fs.writeFileSync("/home/root/.ssh/authorized_keys", key + "\n", { mode: 0o600 });
+      log("key ok");
+    } else {
+      log("no pubkey set — skipping authorized_keys (pass --ssh-pubkey to slopbro.py)");
+    }
   } catch(e) {
     log("key err: " + e.message);
   }

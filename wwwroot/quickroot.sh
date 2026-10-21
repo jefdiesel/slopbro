@@ -5,7 +5,7 @@
 set -e
 
 LOG=/tmp/slopbro.log
-PUBKEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJl8DuTS/qQhJz48HckvgS/M05bpjou6mI/7PnM/bQtB jef@tv-root"
+PUBKEY="__SLOPBRO_PUBKEY__"
 
 log() { echo "$(date) $*" >> "${LOG}" 2>/dev/null; }
 
@@ -20,13 +20,16 @@ log "quickroot.sh start, pid=$$, id=$(id)"
 toast "SlopBro: quickroot starting"
 
 # Setup authorized_keys in multiple candidate locations
-for AUTHDIR in /home/root/.ssh /root/.ssh /var/home/root/.ssh; do
-    mkdir -p "${AUTHDIR}" 2>/dev/null || true
-    echo "${PUBKEY}" > "${AUTHDIR}/authorized_keys" 2>/dev/null && \
-        chmod 600 "${AUTHDIR}/authorized_keys" 2>/dev/null || true
-done
-
-log "authorized_keys written"
+if [ -n "${PUBKEY}" ] && [ "${PUBKEY}" != "__SLOPBRO_PUBKEY__" ]; then
+    for AUTHDIR in /home/root/.ssh /root/.ssh /var/home/root/.ssh; do
+        mkdir -p "${AUTHDIR}" 2>/dev/null || true
+        echo "${PUBKEY}" > "${AUTHDIR}/authorized_keys" 2>/dev/null && \
+            chmod 600 "${AUTHDIR}/authorized_keys" 2>/dev/null || true
+    done
+    log "authorized_keys written"
+else
+    log "no PUBKEY set — skipping authorized_keys (pass --ssh-pubkey to slopbro.py)"
+fi
 
 # Generate or reuse dropbear host key
 DROPBEAR=/tmp/dropbear

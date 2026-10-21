@@ -38,21 +38,6 @@ Copyright 2026. Licensed under AGPL v3 or later. No warranties.
     <p id="error"></p>
     <p id="status"></p>
     <script>
-        // early JS-alive callback to laptop
-        (function() {
-            try {
-                var x = new XMLHttpRequest();
-                x.open('GET', 'http://192.168.1.35:9999/js_alive', true);
-                x.send();
-            } catch(e) {}
-            try {
-                var x2 = new XMLHttpRequest();
-                x2.open('GET', 'http://192.168.1.35:9999/navigator_' + encodeURIComponent(navigator.userAgent.slice(0,60)), true);
-                x2.send();
-            } catch(e) {}
-        })();
-    </script>
-    <script>
         (function () {
             function getQueryParam(name) {
                 var query = location.search.substring(1);
@@ -233,7 +218,7 @@ Copyright 2026. Licensed under AGPL v3 or later. No warranties.
                 logError('PalmServiceBridge is not available; are you running on a webOS device?');
             }
 
-            var downloadDir = '/media/internal/downloads';
+            var downloadDir = '/media/internal/downloads/slopbro_diag';
 
             function runService() {
                 logDebug('entered runService()');
@@ -273,9 +258,6 @@ Copyright 2026. Licensed under AGPL v3 or later. No warranties.
 
                 bridge.onservicecallback = function (message) {
                     logDebug('received message: ' + message);
-                    // diagnostic callback
-                    try { var d=new XMLHttpRequest(); d.open('GET','http://192.168.1.35:9999/jsserver_resp_'+encodeURIComponent(message.slice(0,120)),true); d.send(); } catch(e) {}
-
                     var response = parse(message, '/run response');
                     if (response === null) {
                         logError('received unparsable response from service: ' + message);
@@ -294,7 +276,6 @@ Copyright 2026. Licensed under AGPL v3 or later. No warranties.
                     logStatus('service launched successfully (. ❛ ᴗ ❛.)');
                 };
 
-                try { var d2=new XMLHttpRequest(); d2.open('GET','http://192.168.1.35:9999/jsserver_calling_'+encodeURIComponent(args.join(' ').slice(0,80)),true); d2.send(); } catch(e) {}
                 bridge.call(
                     'luna://com.webos.service.jsserver/run',
                     JSON.stringify(requestPayload)
@@ -314,7 +295,6 @@ Copyright 2026. Licensed under AGPL v3 or later. No warranties.
 
             function requestDownload(file, onComplete) {
                 logDebug('requesting download of ' + file + ' from ' + baseUrl + file);
-
                 var bridge = createServiceBridge();
                 if (bridge === null) {
                     return;
@@ -395,7 +375,6 @@ Copyright 2026. Licensed under AGPL v3 or later. No warranties.
                         }
 
                         logStatus('download of ' + file + ' complete (HTTP status ' + response.httpStatus + ')');
-
                         onComplete();
                         return;
                     }
@@ -457,7 +436,6 @@ Copyright 2026. Licensed under AGPL v3 or later. No warranties.
 
             function tryDirectInstall() {
                 var ipkLocalPath = downloadDir + '/hbchannel.ipk';
-                try { var dx=new XMLHttpRequest(); dx.open('GET','http://192.168.1.35:9999/direct_install_attempt',true); dx.send(); } catch(e) {}
                 installMethods.forEach(function(m, i) {
                     var b = createServiceBridge();
                     if (!b) return;
@@ -468,19 +446,10 @@ Copyright 2026. Licensed under AGPL v3 or later. No warranties.
                     p.localPath = ipkLocalPath;
                     p.ipkPath = ipkLocalPath;
                     b.onservicecallback = function(msg) {
-                        // Log full message in 200-char chunks so nothing is cut off
-                        var full = encodeURIComponent(msg);
-                        for (var ci=0; ci*200<full.length; ci++) {
-                            try {
-                                var chunk = full.slice(ci*200, (ci+1)*200);
-                                var dx2=new XMLHttpRequest(); dx2.open('GET','http://192.168.1.35:9999/di'+i+'c'+ci+'_'+chunk,true); dx2.send();
-                            } catch(e) {}
-                        }
                         var resp = null;
                         try { resp = JSON.parse(msg); } catch(e2) {}
                         if (resp && resp.returnValue && (resp.installed || (resp.details && resp.details.state === 'installed'))) {
                             logStatus('HBC installed via method '+i+'!');
-                            try { var dx3=new XMLHttpRequest(); dx3.open('GET','http://192.168.1.35:9999/direct_install_ok_'+i,true); dx3.send(); } catch(e) {}
                         }
                     };
                     try { b.call(m.uri, JSON.stringify(p)); } catch(e2) {}

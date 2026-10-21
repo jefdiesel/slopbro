@@ -9,12 +9,6 @@ LOG=/tmp/slopbro.log
 
 echo "$(date) rjsnc pid=$$ downloadDir=${DOWNLOAD_DIR} script=${SHELL_SCRIPT}" >> "${LOG}" 2>/dev/null
 
-# Ping laptop via download manager (works across network namespaces via Luna bus)
-luna-send -w 4000 -n 1 \
-  'luna://com.webos.service.downloadmanager/download' \
-  "{\"target\":\"http://192.168.1.35:9999/shell_rjsnc_started\",\"targetDir\":\"/media/internal/downloads\",\"targetFilename\":\"ping_shell\",\"subscribe\":false}" \
-  >/dev/null 2>/dev/null &
-
 # Escape jsserver's restricted cgroup so children survive after Node exits
 PID=$$
 for cgfile in \
